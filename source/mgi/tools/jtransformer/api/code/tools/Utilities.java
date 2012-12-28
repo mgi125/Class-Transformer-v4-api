@@ -121,7 +121,7 @@ public class Utilities {
 			return Opcodes.IADD;
 		else if (type == Type.LONG_TYPE)
 			return Opcodes.LADD;
-		else if (type == Type.BYTE_TYPE)
+		else if (type == Type.FLOAT_TYPE)
 			return Opcodes.FADD;
 		else if (type == Type.DOUBLE_TYPE)
 			return Opcodes.DADD;

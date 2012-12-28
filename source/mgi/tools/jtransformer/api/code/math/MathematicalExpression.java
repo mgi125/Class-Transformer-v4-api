@@ -84,7 +84,10 @@ public class MathematicalExpression extends ExpressionNode {
 
 	@Override
 	public Type getType() {
-		return Utilities.binaryOperationType(left.getType(), right.getType());
+		if (type == TYPE_SHL || type == TYPE_SHR)
+			return Utilities.unaryOperationType(left.getType());
+		else
+			return Utilities.binaryOperationType(left.getType(), right.getType());
 	}
 	
 	@Override
@@ -146,12 +149,22 @@ public class MathematicalExpression extends ExpressionNode {
 
 	@Override
 	public void accept(MethodVisitor visitor) {
+		Type leftType = null;
+		Type rightType = null;
+		if (type == TYPE_SHL || type == TYPE_SHR) {
+			leftType = getType();
+			rightType = Type.INT_TYPE;
+		}
+		else {
+			leftType = rightType = getType();
+		}
 		left.accept(visitor);
-		int[] lCast = Utilities.primitiveCastOpcodes(left.getType(), getType());
+		int[] lCast = Utilities.primitiveCastOpcodes(left.getType(), leftType);
 		for (int i = 0; i < lCast.length; i++)
 			visitor.visitInsn(lCast[i]);
+		
 		right.accept(visitor);
-		int[] rCast = Utilities.primitiveCastOpcodes(right.getType(), getType());
+		int[] rCast = Utilities.primitiveCastOpcodes(right.getType(), rightType);
 		for (int i = 0; i < rCast.length; i++)
 			visitor.visitInsn(rCast[i]);
 		int opcode;

@@ -3,6 +3,7 @@ package mgi.tools.jtransformer.api.code.generation;
 import java.util.ArrayList;
 import java.util.List;
 
+import mgi.tools.jtransformer.Constants;
 import mgi.tools.jtransformer.api.ClassNode;
 import mgi.tools.jtransformer.api.MethodNode;
 import mgi.tools.jtransformer.api.code.AbstractCodeNode;
@@ -309,6 +310,9 @@ public class CodeGenerator extends MethodVisitor {
 				generateBlock(((LabelInstruction)instruction).getLabel(), stack.copy());
 				break;
 			}
+			else if (op == Opcodes.NOP) {
+				//hmm??
+			}
 			else if (op == Opcodes.GOTO) {
 				dumpStack(block, stack);
 				Block target = generateBlock(((JumpInstruction)instruction).getTarget(), stack.copy());
@@ -512,7 +516,7 @@ public class CodeGenerator extends MethodVisitor {
 				block.getCode().add(new PopableNode(expr));
 			}
 			else if (op == Opcodes.POP2) {
-				if (stack.peek().size() == 64) {
+				if (stack.peek().getType().getSize() == 2) {
 					if (stack.getSize() > 1)
 						dumpStack(block, stack);
 					ExpressionNode expr = stack.pop();
@@ -736,16 +740,16 @@ public class CodeGenerator extends MethodVisitor {
 		}
 		int miscStore = miscDumpsStartAddress;
 		for (int i = 0; i < expressions.length; i++) { 
-			if (expressions[i] instanceof VariableLoadExpression && ((VariableLoadExpression)expressions[i]).getIndex() >= store) {
+			//if (expressions[i] instanceof VariableLoadExpression && ((VariableLoadExpression)expressions[i]).getIndex() >= store) {
 				block.getCode().add(new VariableAssignationNode(expressions[i].getType(), miscStore, expressions[i]));
-				expressions[i] = new VariableLoadExpression(expressions[i].getType(), miscStore);
+				expressions[i] = new VariableLoadExpression(Utilities.variableLoadType(Utilities.variableLoadOpcode(expressions[i].getType())), miscStore);
 				miscStore += expressions[i].getType().getSize();
-			}
+			//}
 		}
 		
 		for (int i = 0; i < expressions.length; i++) {
 			block.getCode().add(new VariableAssignationNode(expressions[i].getType(), store, expressions[i]));
-			stack.push(new VariableLoadExpression(expressions[i].getType(), store));
+			stack.push(new VariableLoadExpression(Utilities.variableLoadType(Utilities.variableLoadOpcode(expressions[i].getType())), store));
 			store += expressions[i].getType().getSize();
 		}
 		if ((parent.getParent().getOptions() & ClassNode.OPT_GENERATION_PRINT_STACK_DUMPS) != 0) {
@@ -768,7 +772,7 @@ public class CodeGenerator extends MethodVisitor {
 				return false;
 			if (((VariableLoadExpression)expr1).getIndex() != ((VariableLoadExpression)expr2).getIndex())
 				return false;
-			if (expr1.getType() != expr2.getType())
+			if (!expr1.getType().getDescriptor().equals(expr2.getType().getDescriptor()))
 				return false;
 		}
 		return true;

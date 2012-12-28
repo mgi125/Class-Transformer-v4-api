@@ -16,7 +16,9 @@ import mgi.tools.jtransformer.api.code.CodeNode;
 import mgi.tools.jtransformer.api.code.TryCatchInformation;
 import mgi.tools.jtransformer.api.code.flow.ConditionalJumpNode;
 import mgi.tools.jtransformer.api.code.flow.LabelAnnotation;
+import mgi.tools.jtransformer.api.code.flow.ReturnNode;
 import mgi.tools.jtransformer.api.code.flow.SwitchNode;
+import mgi.tools.jtransformer.api.code.flow.ThrowNode;
 import mgi.tools.jtransformer.api.code.flow.UnconditionalJumpNode;
 import mgi.tools.jtransformer.api.code.math.MathematicalVariableAssignationExpression;
 import mgi.tools.jtransformer.api.code.math.MathematicalVariableAssignationNode;
@@ -108,6 +110,7 @@ public class VariablesAnalyzer {
 		int addr = code.addressOf(visitor.getStart()) + 1;
 		for (; code.read(addr) != null; addr++) { 
 			AbstractCodeNode n = code.read(addr);
+			exploreNode(visitor, n);
 			if (n instanceof LabelAnnotation) {
 				visitJump(visitor, (LabelAnnotation)n);
 				break;
@@ -127,10 +130,10 @@ public class VariablesAnalyzer {
 				visitJump(visitor, sw.getDefault());
 				break;
 			}
-			// TODO subroutines
-			else {
-				exploreNode(visitor, n);
+			else if (n instanceof ReturnNode || n instanceof ThrowNode) {
+				break;
 			}
+			// TODO subroutines
 		}
 	}
 	
@@ -388,7 +391,7 @@ public class VariablesAnalyzer {
 		}
 		
 		public void merge(int index) {
-			expand(index);
+			expand(index + 1);
 			if (exitVariables[index] == null || exitVariables[index].size() < 2)
 				return;
 			VariableInformation[] information = exitVariables[index].toArray(new VariableInformation[0]);
@@ -405,7 +408,7 @@ public class VariablesAnalyzer {
 		}
 		
 		public void addEntry(VariableInformation info) {
-			expand(info.index);
+			expand(info.index + 1);
 			if (entryVariables[info.index] == null)
 				entryVariables[info.index] = new ArrayList<VariableInformation>();
 			if (!entryVariables[info.index].contains(info))
@@ -413,7 +416,7 @@ public class VariablesAnalyzer {
 		}	
 		
 		public VariableInformation getSingle(int index) {
-			expand(index);
+			expand(index + 1);
 			if (exitVariables[index] == null || exitVariables[index].size() != 1)
 				return null;
 			for (VariableInformation info : exitVariables[index])
@@ -422,12 +425,12 @@ public class VariablesAnalyzer {
 		}
 		
 		public List<VariableInformation> get(int index) {
-			expand(index);
+			expand(index + 1);
 			return exitVariables[index];
 		}
 		
 		public void set(VariableInformation info) {
-			expand(info.index);
+			expand(info.index + 1);
 			if (exitVariables[info.index] == null)
 				exitVariables[info.index] = new ArrayList<VariableInformation>();
 			exitVariables[info.index].clear();
@@ -437,7 +440,7 @@ public class VariablesAnalyzer {
 		@SuppressWarnings("unchecked")
 		private void expand(int minRequired) {
 			int required = Math.min(entryVariables.length, exitVariables.length);
-			while (minRequired >= required)
+			while (minRequired > required)
 				required *= 2;
 			if (entryVariables.length != required) {
 				List<?>[] variables = new List<?>[required];

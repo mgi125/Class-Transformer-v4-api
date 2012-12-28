@@ -82,19 +82,18 @@ public class CodeOptimizer {
 		do {
 			total = 0;
 
+			//total += doReduceCasts();
 			
-			total += doMergeLocalVariables();
-			total += doInlineLocalVariables2();
+			total += doInlineLocalVariables();
 			total += doRemoveUnusedLocalVariables();
 
 			total += doTransformNewObjects();
-			total += doTransformLocalVariablesAssign();
+			//total += doTransformLocalVariablesAssign();
 			
-			//total += doReduceCasts();
 			total += doTrimCode();
 		}
 		while (total > 0);
-		
+
 		//List<VariablesAnalyzer.VariableInformation> info = analyzer.getAll();
 		//System.err.println("Done");
 	}
@@ -145,147 +144,8 @@ public class CodeOptimizer {
 			labelsTable.put(target, labelsTable.get(target).intValue() + 1);
 	}
 	
-	
+
 	private int doInlineLocalVariables() {
-		int total = 0;
-		
-		List<VariablesAnalyzer.VariableInformation> variables = analyzer.getAll();
-		for (VariablesAnalyzer.VariableInformation information : variables) {
-			if (information.isArgument() || information.getWrites().size() < 1 || information.getReads().size() < 1)
-				continue;
-			if ((method.getParent().getOptions() & ClassNode.OPT_OPTIMIZATION_SKIP_NONSYNTH_LOCALS) != 0 && information.getIndex() < stackDumpsStartAddress)
-				continue;
-
-			for (AbstractCodeNode x : information.getWrites()) {
-				if (!(x instanceof VariableAssignationNode) && !(x instanceof VariableAssignationExpression))
-					continue;
-				
-				final AbstractCodeNode write = x;
-				final MutableReference<AbstractCodeNode> tail = new MutableReference<AbstractCodeNode>();
-				new NodeExplorer(code) {
-					@Override
-					public void onVisit(AbstractCodeNode n) {
-						if (n != write)
-							return;
-						
-						AbstractCodeNode root = getDepth() >= 2 ? getCurrent(2) : n;
-						boolean reached = false;
-						for (AbstractCodeNode y = root;;) {
-							if (y == write) {
-								reached = true;
-								break;
-							}
-							
-							if (y instanceof VariableAssignationNode) {
-								y = ((VariableAssignationNode)y).getExpression();
-								continue;
-							}
-							else if (y instanceof VariableAssignationExpression) {
-								y = ((VariableAssignationExpression)y).getExpression();
-								continue;
-							}
-							else if (y instanceof FieldAssignationNode) {
-								y = ((FieldAssignationNode)y).getExpression();
-								continue;
-							}
-							else if (y instanceof FieldAssignationExpression) {
-								y = ((FieldAssignationExpression)y).getExpression();
-								continue;
-							}
-							else if (y instanceof ArrayAssignationNode) {
-								y = ((ArrayAssignationNode)y).getValue();
-								continue;
-							}
-							else if (y instanceof ArrayAssignationExpression) {
-								y = ((ArrayAssignationExpression)y).getValue();
-								continue;
-							}
-							
-							break;
-						}
-						
-						if (reached) {
-							tail.set(root);
-						}
-
-						doBreak();
-						return;
-					}
-				}.explore();
-				
-				if (tail.get() == null) {
-					continue;
-				}
-				
-				final MutableInteger status = new MutableInteger();
-				final VariablesAnalyzer.VariableInformation info = information;
-				new NodeExplorer(code) {
-					private boolean foundWrite = false;
-					
-					@Override
-					public void onVisit(AbstractCodeNode n) {
-						if (!foundWrite && n != tail.get())
-							return;
-						else if (!foundWrite && n == tail.get()) {
-							foundWrite = true;
-							return;
-						}
-						
-						if ((n instanceof LabelAnnotation && importantUsesCount(((LabelAnnotation)n)) > 0)) {
-							doBreak();
-							return;
-						}
-						else if (info.getReads().contains(n)) {
-							AbstractCodeNode transformed = null;
-							AbstractCodeNode untransformed = tail.get();
-							if (untransformed instanceof VariableAssignationNode) {
-								VariableAssignationNode u = (VariableAssignationNode)untransformed;
-								transformed = new VariableAssignationExpression(u.getVariableType(), u.getIndex(), u.getExpression());
-								
-								VariablesAnalyzer.VariableInformation i = analyzer.find(u.getIndex(), u);
-								i.getWrites().remove(u);
-								i.getWrites().add(transformed);
-							}
-							else if (untransformed instanceof FieldAssignationNode) {
-								FieldAssignationNode u = (FieldAssignationNode)untransformed;
-								transformed = new FieldAssignationExpression(u.getInstanceExpression(), u.getExpression(), u.getOwner(), u.getName(), u.getDescriptor());
-							}
-							else if (untransformed instanceof ArrayAssignationNode) {
-								ArrayAssignationNode u = (ArrayAssignationNode)untransformed;
-								transformed = new ArrayAssignationExpression(u.getStoreType(), u.getBase(), u.getIndex(), u.getValue());
-							}
-							else {
-								throw new RuntimeException("WT");
-							}
-							
-							info.getReads().remove(n);
-							code.delete(code.addressOf(untransformed));
-							getCurrent(getDepth()).overwrite(transformed, getCurrentAddr(getDepth()));
-							status.set(1);
-							
-							doBreak();
-							return;
-							
-						}
-						else if (n.altersFlow() || tail.get().affectedBy(n) || n.affectedBy(tail.get())) {
-							doBreak();
-							return;
-						}
-					}
-				}.explore();
-				
-				if (status.get() == 1) {
-					total++;
-				}
-			}
-			
-		}
-		
-		return total;
-	}
-	
-	
-	private int doInlineLocalVariables2() {
 		int total = 0;
 		
 		List<VariablesAnalyzer.VariableInformation> variables = analyzer.getAll();
@@ -421,8 +281,8 @@ public class CodeOptimizer {
 							}
 							
 							info.getReads().remove(n);
-							code.delete(code.addressOf(untransformed));
 							getCurrent(getDepth()).overwrite(transformed, getCurrentAddr(getDepth()));
+							code.delete(code.addressOf(untransformed));
 							status.set(1);
 							
 
@@ -446,6 +306,7 @@ public class CodeOptimizer {
 				
 				if (status.get() == 1) {
 					total++;
+					break; // might have modified
 				}
 			}
 			
@@ -455,106 +316,7 @@ public class CodeOptimizer {
 	}
 	
 	
-	private int doTransformNewObjects() {
-		int total = 0;
-		for (int addr = 0; code.read(addr) != null && code.read(addr + 1) != null; addr++) {
-			AbstractCodeNode n1 = code.read(addr + 0);
-			AbstractCodeNode n2 = code.read(addr + 1);
-			
-			if (n1 instanceof VariableAssignationNode && n2 instanceof PopableNode) {
-				VariableAssignationNode assign = (VariableAssignationNode)n1;
-				PopableNode pop = (PopableNode)n2;
-				
-				if (assign.getExpression() instanceof NewUninitializedObjectExpression && pop.getExpression() instanceof InvokeExpression) {
-					NewUninitializedObjectExpression newObj = (NewUninitializedObjectExpression)assign.getExpression();
-					InvokeExpression invoke = (InvokeExpression)pop.getExpression();
-					if (invoke.getName().equals("<init>") && invoke.getArguments()[0] instanceof VariableLoadExpression) {
-						VariableLoadExpression loadExpr = (VariableLoadExpression)invoke.getArguments()[0];
-						if (loadExpr.getIndex() == assign.getIndex()) {
-							analyzer.find(loadExpr.getIndex(), loadExpr).getReads().remove(loadExpr);
-							code.delete(addr + 1);
-							ExpressionNode[] arguments = new ExpressionNode[invoke.getArguments().length - 1];
-							for (int i = 0; i < arguments.length; i++)
-								arguments[i] = invoke.getArguments()[i + 1];
-							assign.setExpression(new NewObjectExpression(newObj.getObjectType(), arguments, invoke.getOwner(), invoke.getDescriptor()));
-							total++;
-						}
-					}
-				}
-			}
-		}
-		
-		for (int addr = 0; code.read(addr) != null; addr++) {
-			AbstractCodeNode n1 = code.read(addr + 0);
-			if (n1 instanceof PopableNode) {
-				PopableNode pop = (PopableNode)n1;
-				if (pop.getExpression() instanceof InvokeExpression) {
-					InvokeExpression invoke = (InvokeExpression)pop.getExpression();
-					if (invoke.getName().equals("<init>") && invoke.getArguments()[0] instanceof VariableAssignationExpression) {
-						VariableAssignationExpression assign = (VariableAssignationExpression)invoke.getArguments()[0];
-						if (assign.getExpression() instanceof NewUninitializedObjectExpression) {
-							NewUninitializedObjectExpression newObj = (NewUninitializedObjectExpression)assign.getExpression();
-							ExpressionNode[] arguments = new ExpressionNode[invoke.getArguments().length - 1];
-							for (int i = 0; i < arguments.length; i++)
-								arguments[i] = invoke.getArguments()[i + 1];
-							NewObjectExpression newObjExpr = new NewObjectExpression(newObj.getObjectType(), arguments, invoke.getOwner(), invoke.getDescriptor());
-							VariableAssignationNode assignNode = new VariableAssignationNode(assign.getVariableType(), assign.getIndex(), newObjExpr);
-							VariablesAnalyzer.VariableInformation info = analyzer.find(assign.getIndex(), assign);
-							info.getWrites().remove(assign);
-							info.getWrites().add(assignNode);
-							code.overwrite(assignNode, code.addressOf(pop));
-							total++;
-						}
-					}
-				}
-			}
-		}
-		return total;
-	}
-	
-	private int doMergeLocalVariables() {
-		final MutableInteger status = new MutableInteger();
-		NodeExplorer explorer = new NodeExplorer(code) {
-			@Override
-			public void onVisit(AbstractCodeNode n) {
-				AbstractCodeNode parent = getCurrent(getDepth());
-				if (n instanceof VariableLoadExpression && parent instanceof VariableAssignationNode) {
-					if (((VariableLoadExpression)n).getIndex() == ((VariableAssignationNode)parent).getIndex()) {
-						VariablesAnalyzer.VariableInformation i1 = analyzer.find(((VariableLoadExpression)n).getIndex(), n);
-						VariablesAnalyzer.VariableInformation i2 = analyzer.find(((VariableAssignationNode)parent).getIndex(), parent);
-						VariablesAnalyzer.VariableInformation info = i1;
-						if (i1 != i2)
-							info = analyzer.mergeExternal(i1, i2);
-						
-						info.getReads().remove(n);
-						info.getWrites().remove(parent);
-						code.delete(code.addressOf(parent));
-						status.set(1);
-						doBreak(); // break cause some routines might be damaged due to code deletion.
-						return;
-					}
-				}
-				else if (n instanceof VariableLoadExpression && parent instanceof VariableAssignationExpression) {
-					if (((VariableLoadExpression)n).getIndex() == ((VariableAssignationExpression)parent).getIndex()) {
-						VariablesAnalyzer.VariableInformation i1 = analyzer.find(((VariableLoadExpression)n).getIndex(), n);
-						VariablesAnalyzer.VariableInformation i2 = analyzer.find(((VariableAssignationExpression)parent).getIndex(), parent);
-						VariablesAnalyzer.VariableInformation info = i1;
-						if (i1 != i2)
-							info = analyzer.mergeExternal(i1, i2);
-						
-						info.getWrites().remove(parent);
-						getCurrent(getDepth() - 1).overwrite(n, getCurrentAddr(getDepth() - 1));
-						
-						status.set(status.get() + 1);
-						doBreak(); // break cause some routines might be damaged due to code deletion.
-						return;
-					}
-				}
-			}
-		};
-		explorer.explore();
-		return status.get();
-	}
+
 	
 	private int doRemoveUnusedLocalVariables() {
 		int total = 0;
@@ -656,24 +418,6 @@ public class CodeOptimizer {
 		return status.get();
 	}
 	
-	
-	private int doTrimCode() {
-		int total = 0;
-		
-		for (int addr = 0; code.read(addr) != null;) {
-			AbstractCodeNode n = code.read(addr);
-			if (n.canTrim()) {
-				code.delete(addr);
-				total++;
-			}
-			else {
-				addr++;
-			}
-		}
-		
-		return total;
-	}
-	
 	private int doReduceCasts() {
 		final MutableInteger total = new MutableInteger();
 		
@@ -743,5 +487,98 @@ public class CodeOptimizer {
 		
 		return total.get();
 	}
+	
+	
+	private int doTrimCode() {
+		int total = 0;
+		
+		for (int addr = 0; code.read(addr) != null;) {
+			AbstractCodeNode n = code.read(addr);
+			if (n.canTrim()) {
+				deregisterFromAnalyzer(n);
+				code.delete(addr);
+				total++;
+			}
+			else {
+				addr++;
+			}
+		}
+		
+		return total;
+	}
+	
+	private void deregisterFromAnalyzer(AbstractCodeNode n) {
+		for (int addr = 0; n.read(addr) != null; addr++)
+			deregisterFromAnalyzer(n.read(addr));
+		if (n instanceof VariableLoadExpression)
+			analyzer.find(((VariableLoadExpression)n).getIndex(), n).getReads().remove(n);
+		else if (n instanceof VariableAssignationNode)
+			analyzer.find(((VariableAssignationNode)n).getIndex(), n).getWrites().remove(n);
+		else if (n instanceof VariableAssignationExpression)
+			analyzer.find(((VariableAssignationExpression)n).getIndex(), n).getWrites().remove(n);
+		else if (n instanceof MathematicalVariableAssignationNode)
+			analyzer.find(((MathematicalVariableAssignationNode)n).getIndex(), n).getWrites().remove(n);
+		else if (n instanceof MathematicalVariableAssignationExpression)
+			analyzer.find(((MathematicalVariableAssignationExpression)n).getIndex(), n).getWrites().remove(n);
+	}
+	
+	private int doTransformNewObjects() {
+		int total = 0;
+		for (int addr = 0; code.read(addr) != null && code.read(addr + 1) != null; addr++) {
+			AbstractCodeNode n1 = code.read(addr + 0);
+			AbstractCodeNode n2 = code.read(addr + 1);
+			
+			if (n1 instanceof VariableAssignationNode && n2 instanceof PopableNode) {
+				VariableAssignationNode assign = (VariableAssignationNode)n1;
+				PopableNode pop = (PopableNode)n2;
+				
+				if (assign.getExpression() instanceof NewUninitializedObjectExpression && pop.getExpression() instanceof InvokeExpression) {
+					NewUninitializedObjectExpression newObj = (NewUninitializedObjectExpression)assign.getExpression();
+					InvokeExpression invoke = (InvokeExpression)pop.getExpression();
+					if (invoke.getName().equals("<init>") && invoke.getArguments()[0] instanceof VariableLoadExpression) {
+						VariableLoadExpression loadExpr = (VariableLoadExpression)invoke.getArguments()[0];
+						if (loadExpr.getIndex() == assign.getIndex()) {
+							analyzer.find(loadExpr.getIndex(), loadExpr).getReads().remove(loadExpr);
+							code.delete(addr + 1);
+							ExpressionNode[] arguments = new ExpressionNode[invoke.getArguments().length - 1];
+							for (int i = 0; i < arguments.length; i++)
+								arguments[i] = invoke.getArguments()[i + 1];
+							assign.setExpression(new NewObjectExpression(newObj.getObjectType(), arguments, invoke.getOwner(), invoke.getDescriptor()));
+							total++;
+						}
+					}
+				}
+			}
+		}
+		
+		for (int addr = 0; code.read(addr) != null; addr++) {
+			AbstractCodeNode n1 = code.read(addr + 0);
+			if (n1 instanceof PopableNode) {
+				PopableNode pop = (PopableNode)n1;
+				if (pop.getExpression() instanceof InvokeExpression) {
+					InvokeExpression invoke = (InvokeExpression)pop.getExpression();
+					if (invoke.getName().equals("<init>") && invoke.getArguments()[0] instanceof VariableAssignationExpression) {
+						VariableAssignationExpression assign = (VariableAssignationExpression)invoke.getArguments()[0];
+						if (assign.getExpression() instanceof NewUninitializedObjectExpression) {
+							NewUninitializedObjectExpression newObj = (NewUninitializedObjectExpression)assign.getExpression();
+							ExpressionNode[] arguments = new ExpressionNode[invoke.getArguments().length - 1];
+							for (int i = 0; i < arguments.length; i++)
+								arguments[i] = invoke.getArguments()[i + 1];
+							NewObjectExpression newObjExpr = new NewObjectExpression(newObj.getObjectType(), arguments, invoke.getOwner(), invoke.getDescriptor());
+							VariableAssignationNode assignNode = new VariableAssignationNode(assign.getVariableType(), assign.getIndex(), newObjExpr);
+							VariablesAnalyzer.VariableInformation info = analyzer.find(assign.getIndex(), assign);
+							info.getWrites().remove(assign);
+							info.getWrites().add(assignNode);
+							code.overwrite(assignNode, code.addressOf(pop));
+							total++;
+						}
+					}
+				}
+			}
+		}
+		return total;
+	}
+	
+
 
 }

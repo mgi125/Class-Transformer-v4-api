@@ -213,7 +213,7 @@ public class ClassNode extends ClassVisitor {
 	 */
 	public byte[] toByteArray() throws RuntimeException {
 		try {
-			ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+			ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 			accept(writer);
 			return writer.toByteArray();
 		}

@@ -5,7 +5,7 @@ import java.util.Arrays;
 
 public class ArrayQueue<T> {
 
-	public static final int INITIAL_CAPACITY = 1000;
+	public static final int INITIAL_CAPACITY = 2;
 	
 	private Object[] queue;
 	private int top;
