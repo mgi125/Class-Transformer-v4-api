@@ -1,0 +1,41 @@
+newarray // done
+anewarray // done
+multianewarray // done
+
+fcmpg // done
+fcmpl // done
+dcmpg // done
+dcmpl // done
+lcmp // done
+
+ineg // done
+fneg // done
+dneg // done
+lneg // done
+
+goto // done
+if_acmpeq // done
+if_acmpne // done
+if_icmpeq // done
+if_icmpne // done
+if_icmpge // done
+if_icmpgt // done
+if_icmple // done
+if_icmplt // done
+if_icmpne // done
+ifeq // done
+ifge // done
+ifgt // done
+ifle // done
+iflt // done
+ifne // done
+ifnonnull // done
+ifnull // done
+
+jsr
+ret
+
+lookupswitch // done
+tableswitch // done
+monitorenter // done
+monitorexit // done

@@ -1,0 +1,13 @@
+DONE! TODO Add cast's support for MathematicalExpression , this way it can prevent some patterns from breaking. (eg optimizer creating mathematicalVariableAssignationExpr/node)
+TODO delete the obsolete method copy() on abstractcodenode and rename copyAsExpr() back to copy() on expression node.
+TODO implement iinc optimization on mathematicalvariableassignationexpression/node
+
+BIGTODO implement expr to node converter when expr parent is popable node
+BIGTODO implement auto casts to all memory expressions, return node
+
+
+
+FIXED! BUG:Unused variables eraser might erase expr's which are necessary but does not return true on altersLogic() (Other variable writes for ex).
+BUG:altersFlow() should check child nodes for flow altering effect!
+BUG:Fix casting & type bugs in MathematicalVariableAssignationNode/Expr and MathematicalFieldAssignationNode/Expr and MathematicalArrayAssignationNode/Expr
+BUG:Add checks if variable can be propagated backwards in doInlineLocalVariables2()
