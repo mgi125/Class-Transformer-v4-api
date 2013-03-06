@@ -3,8 +3,6 @@ package mgi.tools.jtransformer.api.code.general;
 import mgi.tools.jtransformer.api.code.AbstractCodeNode;
 import mgi.tools.jtransformer.api.code.CodePrinter;
 import mgi.tools.jtransformer.api.code.ExpressionNode;
-import mgi.tools.jtransformer.api.code.memory.VariableAssignationExpression;
-import mgi.tools.jtransformer.api.code.tools.Utilities;
 
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -60,16 +58,7 @@ public class MonitorNode extends AbstractCodeNode {
 	
 	@Override
 	public void accept(MethodVisitor visitor) {
-		if (type == TYPE_MONITORENTER && expression instanceof VariableAssignationExpression) {
-			// TODO , for now, cheap hax to fix old decompilers bugs
-			VariableAssignationExpression assign = (VariableAssignationExpression)expression;
-			assign.getExpression().accept(visitor);
-			visitor.visitVarInsn(Utilities.variableStoreOpcode(assign.getType()), assign.getIndex());
-			visitor.visitVarInsn(Utilities.variableLoadOpcode(assign.getType()), assign.getIndex());
-		}
-		else {
-			expression.accept(visitor);
-		}
+		expression.accept(visitor);
 		visitor.visitInsn(type == TYPE_MONITORENTER ? Opcodes.MONITORENTER : Opcodes.MONITOREXIT);
 	}
 

@@ -9,7 +9,7 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-public class ArrayAssignationExpression extends ExpressionNode {
+public class ArrayAssignmentExpression extends ExpressionNode {
 
 	public static final int STORE_TYPE_BYTE = 0;
 	public static final int STORE_TYPE_SHORT = 1;
@@ -50,7 +50,7 @@ public class ArrayAssignationExpression extends ExpressionNode {
 	private ExpressionNode value;
 	
 	
-	public ArrayAssignationExpression(int type, ExpressionNode base, ExpressionNode index, ExpressionNode value) {
+	public ArrayAssignmentExpression(int type, ExpressionNode base, ExpressionNode index, ExpressionNode value) {
 		this.type = type;
 		this.base = base;
 		this.index = index;
@@ -101,7 +101,7 @@ public class ArrayAssignationExpression extends ExpressionNode {
 	
 	@Override
 	public ExpressionNode copy() {
-		return new ArrayAssignationExpression(type, base.copy(), index.copy(), value.copy());
+		return new ArrayAssignmentExpression(type, base.copy(), index.copy(), value.copy());
 	}
 
 	@Override

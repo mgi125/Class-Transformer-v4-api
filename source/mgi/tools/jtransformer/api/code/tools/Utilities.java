@@ -6,7 +6,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 import mgi.tools.jtransformer.api.code.flow.ConditionalJumpNode;
-import mgi.tools.jtransformer.api.code.memory.ArrayAssignationExpression;
+import mgi.tools.jtransformer.api.code.memory.ArrayAssignmentExpression;
 import mgi.tools.jtransformer.api.code.memory.ArrayLoadExpression;
 
 public class Utilities {
@@ -40,6 +40,21 @@ public class Utilities {
 			throw new RuntimeException("WO");
 	}
 	
+	public static Type variableStoreType(int opcode) {
+		if (opcode == Opcodes.ISTORE)
+			return Type.INT_TYPE;
+		else if (opcode == Opcodes.LSTORE)
+			return Type.LONG_TYPE;
+		else if (opcode == Opcodes.FSTORE)
+			return Type.FLOAT_TYPE;
+		else if (opcode == Opcodes.DSTORE)
+			return Type.DOUBLE_TYPE;
+		else if (opcode == Opcodes.ASTORE)
+			return Type.getType("Ljava/lang/Object;");
+		else
+			throw new RuntimeException("WO");
+	}
+
 	public static int variableLoadOpcode(Type type) {
 		if (type.getSort() >= Type.BOOLEAN && type.getSort() <= Type.INT)
 			return Opcodes.ILOAD;
@@ -407,21 +422,21 @@ public class Utilities {
 	public static int arrayStoreType(int opcode) {
 		switch (opcode) {
 			case Opcodes.BASTORE:
-				return ArrayAssignationExpression.STORE_TYPE_BYTE;
+				return ArrayAssignmentExpression.STORE_TYPE_BYTE;
 			case Opcodes.CASTORE:
-				return ArrayAssignationExpression.STORE_TYPE_CHAR;
+				return ArrayAssignmentExpression.STORE_TYPE_CHAR;
 			case Opcodes.SASTORE:
-				return ArrayAssignationExpression.STORE_TYPE_SHORT;
+				return ArrayAssignmentExpression.STORE_TYPE_SHORT;
 			case Opcodes.IASTORE:
-				return ArrayAssignationExpression.STORE_TYPE_INT;
+				return ArrayAssignmentExpression.STORE_TYPE_INT;
 			case Opcodes.LASTORE:
-				return ArrayAssignationExpression.STORE_TYPE_LONG;
+				return ArrayAssignmentExpression.STORE_TYPE_LONG;
 			case Opcodes.FASTORE:
-				return ArrayAssignationExpression.STORE_TYPE_FLOAT;
+				return ArrayAssignmentExpression.STORE_TYPE_FLOAT;
 			case Opcodes.DASTORE:
-				return ArrayAssignationExpression.STORE_TYPE_DOUBLE;
+				return ArrayAssignmentExpression.STORE_TYPE_DOUBLE;
 			case Opcodes.AASTORE:
-				return ArrayAssignationExpression.STORE_TYPE_OBJECT;
+				return ArrayAssignmentExpression.STORE_TYPE_OBJECT;
 			default:
 				throw new RuntimeException("WT");
 		}
@@ -509,6 +524,17 @@ public class Utilities {
 			return Opcodes.FNEG;
 		else if (type == Type.DOUBLE_TYPE)
 			return Opcodes.DNEG;
+		else
+			throw new RuntimeException("WT");
+	}
+	
+	public static Type baseType(Type t1) {
+		if (t1.getSort() >= Type.BOOLEAN && t1.getSort() <= Type.INT)
+			return Type.INT_TYPE;
+		else if (t1.getSort() >= Type.FLOAT && t1.getSort() <= Type.DOUBLE)
+			return t1;
+		else if (t1.getSort() >= Type.ARRAY && t1.getSort() <= Type.OBJECT)
+			return Type.getType("Ljava/lang/Object;");
 		else
 			throw new RuntimeException("WT");
 	}

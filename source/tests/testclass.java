@@ -10,7 +10,7 @@ public class testclass {
 	public int ya,yb,yc,yd,ye,yf,yg,yh;
 	public byte x;
 	public int y;
-	public long l;
+	public long l,n,o;
 	public long[] ax,bx,cx;
 	
 	public double testx() {
@@ -25,6 +25,53 @@ public class testclass {
 		return -1;
 	}
 	
+	public void assignTest() {
+		// assignation node
+		int var1 = 1;
+		// assignation expr
+		int var2 = var1 = 2;
+		
+		// math assignation node
+		var1 += 1;
+		// math assignation expr
+		System.err.println(var1 += 1);
+		
+		// static assignation node
+		ba = 1;
+		// static assignation expr
+		ba = bb = 2;
+		
+		// static math assignation node
+		ba += 1;
+		// static math assignation expr
+		System.err.println(ba += 1);
+		
+		// instanced assignation node
+		l = 1;
+		// instanced assignation expr
+		l = n = 2;
+		
+		// instanced math assignation node
+		l += 1;
+		// instanced math assignation expr
+		System.err.println(l += 1);
+		
+		double[] array1 = new double[10];
+		long[] array2 = new long[10];
+		
+		// assignation node
+		array1[0] = 1;
+		// assignation expr
+		array1[0] = array2[0] = 2;
+		
+		// math assignation node
+		array1[0] += 1;
+		// math assignation expr
+		System.err.println(array1[0] += 1);
+		
+		
+		
+	}
 	
 	public static int[] anIntArray1 = new int[64];
 	public static int anInt1 = -30241709;

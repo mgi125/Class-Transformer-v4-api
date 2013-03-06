@@ -8,10 +8,10 @@ import mgi.tools.jtransformer.api.code.tools.Utilities;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 
-public class VariableAssignationExpression extends ExpressionNode {
+public class RawVariableAssignmentNode extends AbstractCodeNode {
 
 	/**
-	 * Contains variable type.
+	 * Contains type of variable.
 	 */
 	private Type variableType;
 	/**
@@ -23,7 +23,7 @@ public class VariableAssignationExpression extends ExpressionNode {
 	 */
 	private ExpressionNode expression;
 	
-	public VariableAssignationExpression(Type variableType, int index, ExpressionNode expr) {
+	public RawVariableAssignmentNode(Type variableType, int index, ExpressionNode expr) {
 		this.variableType = variableType;
 		this.index = index;
 		this.expression = expr;
@@ -38,7 +38,7 @@ public class VariableAssignationExpression extends ExpressionNode {
 	
 	@Override
 	public boolean altersLogic() {
-		return false;
+		return expression.altersLogic();
 	}
 
 	@Override
@@ -55,21 +55,6 @@ public class VariableAssignationExpression extends ExpressionNode {
 	public void onChildUpdated(int addr) {
 		setExpression((ExpressionNode)read(addr));
 	}
-	
-	@Override
-	public ExpressionNode copy() {
-		return new VariableAssignationExpression(variableType, index,expression.copy());
-	}
-
-	@Override
-	public Type getType() {
-		return variableType;
-	}
-	
-	@Override
-	public int getPriority() {
-		return ExpressionNode.PRIORITY_ASSIGNMENT;
-	}
 
 	@Override
 	public void accept(MethodVisitor visitor) {
@@ -79,20 +64,14 @@ public class VariableAssignationExpression extends ExpressionNode {
 			for (int i = 0; i < cast.length; i++)
 				visitor.visitInsn(cast[i]);
 		}
-		visitor.visitInsn(Utilities.dupOpcode(getType()));
-		visitor.visitVarInsn(Utilities.variableStoreOpcode(getType()), index);
+		visitor.visitVarInsn(Utilities.variableStoreOpcode(variableType), index);
 	}
 
 	@Override
 	public void print(CodePrinter printer) {
-		int selfPriority = getPriority();
-		int expressionPriority = expression.getPriority();
 		printer.print("var_" + index + " = ");
-		if (expressionPriority > selfPriority)
-			printer.print('(');
 		expression.print(printer);
-		if (expressionPriority > selfPriority)
-			printer.print(')');
+		printer.print(';');
 	}
 	
 	@Override
@@ -124,6 +103,5 @@ public class VariableAssignationExpression extends ExpressionNode {
 	public void setVariableType(Type variableType) {
 		this.variableType = variableType;
 	}
-
 
 }

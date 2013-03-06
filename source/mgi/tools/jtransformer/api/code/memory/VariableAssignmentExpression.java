@@ -3,29 +3,25 @@ package mgi.tools.jtransformer.api.code.memory;
 import mgi.tools.jtransformer.api.code.AbstractCodeNode;
 import mgi.tools.jtransformer.api.code.CodePrinter;
 import mgi.tools.jtransformer.api.code.ExpressionNode;
+import mgi.tools.jtransformer.api.code.LocalVariableDeclaration;
 import mgi.tools.jtransformer.api.code.tools.Utilities;
 
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 
-public class VariableAssignationNode extends AbstractCodeNode {
+public class VariableAssignmentExpression extends ExpressionNode {
 
 	/**
-	 * Contains type of variable.
+	 * Contains declaration of local variable.
 	 */
-	private Type variableType;
-	/**
-	 * Index to which expression is being stored.
-	 */
-	private int index;
+	private LocalVariableDeclaration declaration;
 	/**
 	 * Expression which is being stored.
 	 */
 	private ExpressionNode expression;
 	
-	public VariableAssignationNode(Type variableType, int index, ExpressionNode expr) {
-		this.variableType = variableType;
-		this.index = index;
+	public VariableAssignmentExpression(LocalVariableDeclaration declaration, ExpressionNode expr) {
+		this.declaration = declaration;
 		this.expression = expr;
 		
 		overwrite(expr, 0);
@@ -38,7 +34,7 @@ public class VariableAssignationNode extends AbstractCodeNode {
 	
 	@Override
 	public boolean altersLogic() {
-		return expression.altersLogic();
+		return false;
 	}
 
 	@Override
@@ -55,23 +51,44 @@ public class VariableAssignationNode extends AbstractCodeNode {
 	public void onChildUpdated(int addr) {
 		setExpression((ExpressionNode)read(addr));
 	}
+	
+	@Override
+	public ExpressionNode copy() {
+		return new VariableAssignmentExpression(declaration, expression.copy());
+	}
+
+	@Override
+	public Type getType() {
+		return declaration.getType();
+	}
+	
+	@Override
+	public int getPriority() {
+		return ExpressionNode.PRIORITY_ASSIGNMENT;
+	}
 
 	@Override
 	public void accept(MethodVisitor visitor) {
 		expression.accept(visitor);
-		if (Utilities.isPrimitive(variableType)) {
-			int[] cast = Utilities.primitiveCastOpcodes(expression.getType(), variableType);
+		if (Utilities.isPrimitive(declaration.getType())) {
+			int[] cast = Utilities.primitiveCastOpcodes(expression.getType(), declaration.getType());
 			for (int i = 0; i < cast.length; i++)
 				visitor.visitInsn(cast[i]);
 		}
-		visitor.visitVarInsn(Utilities.variableStoreOpcode(variableType), index);
+		visitor.visitInsn(Utilities.dupOpcode(getType()));
+		visitor.visitVarInsn(Utilities.variableStoreOpcode(getType()), declaration.getIndex());
 	}
 
 	@Override
 	public void print(CodePrinter printer) {
-		printer.print("var_" + index + " = ");
+		int selfPriority = getPriority();
+		int expressionPriority = expression.getPriority();
+		printer.print(declaration.getName() + " = ");
+		if (expressionPriority > selfPriority)
+			printer.print('(');
 		expression.print(printer);
-		printer.print(';');
+		if (expressionPriority > selfPriority)
+			printer.print(')');
 	}
 	
 	@Override
@@ -88,20 +105,15 @@ public class VariableAssignationNode extends AbstractCodeNode {
 		return expression;
 	}
 
-	public void setIndex(int index) {
-		this.index = index;
+	public LocalVariableDeclaration getDeclaration() {
+		return declaration;
 	}
 
-	public int getIndex() {
-		return index;
+	public void setDeclaration(LocalVariableDeclaration declaration) {
+		this.declaration = declaration;
 	}
 
-	public Type getVariableType() {
-		return variableType;
-	}
 
-	public void setVariableType(Type variableType) {
-		this.variableType = variableType;
-	}
+
 
 }

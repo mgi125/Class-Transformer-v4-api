@@ -3,8 +3,7 @@ package mgi.tools.jtransformer.api.code.memory;
 import mgi.tools.jtransformer.api.code.AbstractCodeNode;
 import mgi.tools.jtransformer.api.code.CodePrinter;
 import mgi.tools.jtransformer.api.code.ExpressionNode;
-import mgi.tools.jtransformer.api.code.math.MathematicalVariableAssignationExpression;
-import mgi.tools.jtransformer.api.code.math.MathematicalVariableAssignationNode;
+import mgi.tools.jtransformer.api.code.LocalVariableDeclaration;
 import mgi.tools.jtransformer.api.code.tools.Utilities;
 
 import org.objectweb.asm.MethodVisitor;
@@ -13,18 +12,12 @@ import org.objectweb.asm.Type;
 public class VariableLoadExpression extends ExpressionNode {
 
 	/**
-	 * Type of the expression which is being loaded.
+	 * Contains declaration of the variable.
 	 */
-	private Type variableType;
-	/**
-	 * Index to which this expression was dumped 
-	 * instead of stack.
-	 */
-	private int index;
+	private LocalVariableDeclaration declaration;
 	
-	public VariableLoadExpression(Type variableType, int index) {
-		this.variableType = variableType;
-		this.index = index;
+	public VariableLoadExpression(LocalVariableDeclaration declaration) {
+		this.declaration = declaration;
 	}
 	
 	@Override
@@ -47,57 +40,48 @@ public class VariableLoadExpression extends ExpressionNode {
 		for (int addr = 0; n.read(addr) != null; addr++)
 			if (affectedBy(n.read(addr)))
 				return true;
-		if (n instanceof VariableAssignationNode && ((VariableAssignationNode)n).getIndex() == index)
-			return true;
-		else if (n instanceof VariableAssignationExpression && ((VariableAssignationExpression)n).getIndex() == index)
-			return true;
-		else if (n instanceof MathematicalVariableAssignationNode && ((MathematicalVariableAssignationNode)n).getIndex() == index)
-			return true;
-		else if (n instanceof MathematicalVariableAssignationExpression && ((MathematicalVariableAssignationExpression)n).getIndex() == index)
-			return true;
+		if (!(n instanceof VariableAssignmentExpression) && !(n instanceof VariableAssignmentNode))
+			return false;
+		LocalVariableDeclaration declaration = n instanceof VariableAssignmentNode ? ((VariableAssignmentNode)n).getDeclaration() : ((VariableAssignmentExpression)n).getDeclaration();
+		if (declaration == this.declaration || declaration.getIndex() == this.declaration.getIndex())
+			return true; // index collision
 		return false;
 	}
 	
 	@Override
 	public Type getType() {
-		return variableType;
+		return declaration.getType();
 	}
 	
 	@Override
 	public ExpressionNode copy() {
-		return new VariableLoadExpression(variableType, index);
+		return new VariableLoadExpression(declaration);
 	}
 
 	@Override
 	public void accept(MethodVisitor visitor) {
-		visitor.visitVarInsn(Utilities.variableLoadOpcode(getType()), index);
+		visitor.visitVarInsn(Utilities.variableLoadOpcode(getType()), declaration.getIndex());
 	}
 
 	@Override
 	public void print(CodePrinter printer) {
-		printer.print("var_" + index);
+		printer.print(declaration.getName());
 	}
 	
 	@Override
 	public String toString() {
 		return CodePrinter.print(this);
 	}
-	
-	public int getIndex() {
-		return index;
+
+	public LocalVariableDeclaration getDeclaration() {
+		return declaration;
+	}
+
+	public void setDeclaration(LocalVariableDeclaration declaration) {
+		this.declaration = declaration;
 	}
 	
-	public void setIndex(int index) {
-		this.index = index;
-	}
-	
-	public Type getVariableType() {
-		return variableType;
-	}
-	
-	public void setVariableType(Type variableType) {
-		this.variableType = variableType;
-	}
+
 
 
 

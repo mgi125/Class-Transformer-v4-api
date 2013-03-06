@@ -10,7 +10,7 @@ import org.objectweb.asm.Opcodes;
 
 import org.objectweb.asm.Type;
 
-public class FieldAssignationExpression extends ExpressionNode {
+public class FieldAssignmentExpression extends ExpressionNode {
 
 	/**
 	 * Instance expression which represends 
@@ -34,7 +34,7 @@ public class FieldAssignationExpression extends ExpressionNode {
 	 */
 	private String descriptor;
 	
-	public FieldAssignationExpression(ExpressionNode instanceExpression, ExpressionNode expr, String owner, String name, String descriptor) {
+	public FieldAssignmentExpression(ExpressionNode instanceExpression, ExpressionNode expr, String owner, String name, String descriptor) {
 		this.instanceExpression = instanceExpression;
 		this.expression = expr;
 		this.owner = owner;
@@ -69,7 +69,7 @@ public class FieldAssignationExpression extends ExpressionNode {
 	
 	@Override
 	public ExpressionNode copy() {
-		return new FieldAssignationExpression(instanceExpression != null ? instanceExpression.copy() : null, expression.copy(), owner, name, descriptor);
+		return new FieldAssignmentExpression(instanceExpression != null ? instanceExpression.copy() : null, expression.copy(), owner, name, descriptor);
 	}
 
 	@Override

@@ -9,7 +9,7 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-public class ArrayAssignationNode extends AbstractCodeNode {
+public class ArrayAssignmentNode extends AbstractCodeNode {
 
 	public static final int STORE_TYPE_BYTE = 0;
 	public static final int STORE_TYPE_SHORT = 1;
@@ -50,7 +50,7 @@ public class ArrayAssignationNode extends AbstractCodeNode {
 	private ExpressionNode value;
 	
 	
-	public ArrayAssignationNode(int type, ExpressionNode base, ExpressionNode index, ExpressionNode value) {
+	public ArrayAssignmentNode(int type, ExpressionNode base, ExpressionNode index, ExpressionNode value) {
 		this.type = type;
 		this.base = base;
 		this.index = index;

@@ -8,12 +8,15 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 
+import mgi.tools.jtransformer.ClassTransformer;
 import mgi.tools.jtransformer.api.ClassNode;
 import mgi.tools.jtransformer.api.Tree;
 
 public class APITest2 {
 
 	public static void main(String[] args) throws Throwable {
+		ClassTransformer api = ClassTransformer.loadAPI();
+		
 		long totalRead = 0;
 		long totalWrite = 0;
 		Tree tree = new Tree();
@@ -38,7 +41,7 @@ public class APITest2 {
 					buffer[length++] = (byte) val;
 				try {
 					long rStart = System.currentTimeMillis();
-					ClassNode n = new ClassNode(buffer, 0, length, ClassNode.OPT_GENERATION_SKIP_DEBUG_INFORMATION | ClassNode.OPT_OPTIMIZATION_SKIP_NONSYNTH_LOCALS);
+					ClassNode n = new ClassNode(api, buffer, 0, length, ClassNode.OPT_GENERATION_SKIP_DEBUG_INFORMATION | ClassNode.OPT_OPTIMIZATION_SKIP_NONSYNTH_LOCALS);
 					long rEnd = System.currentTimeMillis();
 					totalRead += (rEnd - rStart);
 					tree.add(n);

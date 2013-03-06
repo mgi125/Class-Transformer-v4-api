@@ -1,4 +1,4 @@
-package mgi.tools.jtransformer.api.code.tools;
+package mgi.tools.jtransformer.api.code.analysis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,8 +11,11 @@ import com.sun.xml.internal.ws.org.objectweb.asm.Opcodes;
 
 
 import mgi.tools.jtransformer.api.MethodNode;
+import mgi.tools.jtransformer.api.TypesLoader;
 import mgi.tools.jtransformer.api.code.AbstractCodeNode;
 import mgi.tools.jtransformer.api.code.CodeNode;
+import mgi.tools.jtransformer.api.code.ExpressionNode;
+import mgi.tools.jtransformer.api.code.LocalVariableDeclaration;
 import mgi.tools.jtransformer.api.code.TryCatchInformation;
 import mgi.tools.jtransformer.api.code.flow.ConditionalJumpNode;
 import mgi.tools.jtransformer.api.code.flow.LabelAnnotation;
@@ -23,9 +26,17 @@ import mgi.tools.jtransformer.api.code.flow.UnconditionalJumpNode;
 import mgi.tools.jtransformer.api.code.memory.RawVariableAssignmentExpression;
 import mgi.tools.jtransformer.api.code.memory.RawVariableAssignmentNode;
 import mgi.tools.jtransformer.api.code.memory.RawVariableLoadExpression;
+import mgi.tools.jtransformer.api.code.memory.VariableAssignmentExpression;
+import mgi.tools.jtransformer.api.code.memory.VariableAssignmentNode;
+import mgi.tools.jtransformer.api.code.memory.VariableLoadExpression;
+import mgi.tools.jtransformer.api.code.tools.NodeExplorer;
 import mgi.tools.jtransformer.utilities.ArrayQueue;
 
-public class VariablesAnalyzer {
+/**
+ * Variable's analyzer that analyze's & updates variable types on
+ * their raw read/write nodes/expressions.
+ */
+public class LocalVariablesTypesAnalyzer {
 
 	/**
 	 * Contains method.
@@ -35,6 +46,10 @@ public class VariablesAnalyzer {
 	 * Contains code.
 	 */
 	private CodeNode code;
+	/**
+	 * Contains types loader.
+	 */
+	private TypesLoader typesLoader;
 	/**
 	 * Contains information collected.
 	 */
@@ -50,9 +65,10 @@ public class VariablesAnalyzer {
 	 */
 	private ArrayQueue<Visitor> queue;
 	
-	public VariablesAnalyzer(MethodNode method, CodeNode code) {
+	public LocalVariablesTypesAnalyzer(MethodNode method, CodeNode code) {
 		this.method = method;
 		this.code = code;
+		this.typesLoader = method.getParent().getAPI().getTypesLoader();
 		this.information = new HashMap<Integer, List<VariableInformation>>();
 		int amountBlocks = 0;
 		for (int addr = 0; code.read(addr) != null; addr++)
@@ -68,14 +84,14 @@ public class VariablesAnalyzer {
 		
 		int index = 0;
 		if ((method.getAccessor() & Opcodes.ACC_STATIC) == 0) {
-			VariableInformation info = new VariableInformation(index++, true);
+			VariableInformation info = new VariableInformation(index++, Type.getType("L" + method.getParent().getName() + ";"), true);
 			add(info);
 			v.addEntry(info);
 		}
 		
 		Type[] arguments = Type.getArgumentTypes(method.getDescriptor());
 		for (int i = 0; i < arguments.length; i++) {
-			VariableInformation info = new VariableInformation(index, true);
+			VariableInformation info = new VariableInformation(index, arguments[i], true);
 			add(info);
 			v.addEntry(info);
 			index += arguments[i].getSize();
@@ -85,6 +101,33 @@ public class VariablesAnalyzer {
 			Visitor visitor = queue.take();
 			visit(visitor);
 		}
+	}
+	
+	public void createDeclarations() {
+		final Map<AbstractCodeNode, AbstractCodeNode> replaceTable = new HashMap<AbstractCodeNode, AbstractCodeNode>();
+		for (List<VariableInformation> vars : information.values()) {
+			for (VariableInformation var : vars) {
+				LocalVariableDeclaration declaration = new LocalVariableDeclaration(var.getType(), var.getIndex(), var.isArgument());
+				for (AbstractCodeNode read : var.getReads())
+					replaceTable.put(read, new VariableLoadExpression(declaration));
+				for (AbstractCodeNode write : var.getWrites()) {
+					if (write instanceof VariableAssignmentExpression)
+						replaceTable.put(write, new VariableAssignmentExpression(declaration, (ExpressionNode)write.read(0)));
+					else
+						replaceTable.put(write, new VariableAssignmentNode(declaration, (ExpressionNode)write.read(0)));
+				}
+			}
+		}
+		
+		new NodeExplorer(code) {
+			@Override
+			public void onVisit(AbstractCodeNode n) {
+				AbstractCodeNode replacement = replaceTable.get(n);
+				if (replacement != null) {
+					getCurrent(getDepth()).overwrite(replacement, getCurrentAddr(getDepth()));
+				}
+			}
+		}.explore();
 	}
 	
 	
@@ -141,14 +184,16 @@ public class VariablesAnalyzer {
 		
 		if (n instanceof RawVariableAssignmentNode) {
 			RawVariableAssignmentNode vn = (RawVariableAssignmentNode)n;
-			VariableInformation info = get(vn.getIndex(), vn);
+			VariableInformation info = create(vn.getIndex(), vn.getExpression().getType(), vn);
+			vn.setVariableType(info.getType());
 			if (!info.getWrites().contains(vn))
 				info.getWrites().add(vn);
 			visitor.set(info);
 		}
 		else if (n instanceof RawVariableAssignmentExpression) {
 			RawVariableAssignmentExpression vn = (RawVariableAssignmentExpression)n;
-			VariableInformation info = get(vn.getIndex(), vn);
+			VariableInformation info = create(vn.getIndex(), vn.getExpression().getType(), vn);
+			vn.setVariableType(info.getType());
 			if (!info.getWrites().contains(vn))
 				info.getWrites().add(vn);
 			visitor.set(info);
@@ -157,6 +202,7 @@ public class VariablesAnalyzer {
 			RawVariableLoadExpression vl = (RawVariableLoadExpression)n;
 			visitor.merge(vl.getIndex());
 			VariableInformation info = visitor.getSingle(vl.getIndex());
+			vl.setVariableType(vl.getType());
 			if (info == null) {
 				throw new RuntimeException("WT");
 			}
@@ -208,6 +254,20 @@ public class VariablesAnalyzer {
 		}
 	}
 	
+	/**
+	 * Get's information for specific index and parent,
+	 * if there's no information yet , it creates new information.
+	 */
+	private VariableInformation create(int index, Type type, AbstractCodeNode parent) {
+		VariableInformation info = find(index, parent);
+		if (info != null)
+			return info;
+		info = new VariableInformation(index, type, false);
+		info.getWrites().add(parent);
+		add(info);
+		return info;
+	}
+	
 	
 	/**
 	 * Find's visitor id for given label.
@@ -224,13 +284,6 @@ public class VariablesAnalyzer {
 		return -1;
 	}
 	
-	/**
-	 * Merge's two variables into one.
-	 * For external use.
-	 */
-	public VariableInformation mergeExternal(VariableInformation i1, VariableInformation i2) {
-		return merge(i1, i2);
-	}
 	
 	/**
 	 * Merge's two variables into one.
@@ -238,7 +291,7 @@ public class VariablesAnalyzer {
 	private VariableInformation merge(VariableInformation i1, VariableInformation i2) {
 		if (i1.getIndex() != i2.getIndex())
 			throw new RuntimeException("WT");
-		VariableInformation info = new VariableInformation(i1.getIndex(), i1.isArgument() || i2.isArgument());
+		VariableInformation info = new VariableInformation(i1.getIndex(), typesLoader.getCommonType(i1.getType(), i2.getType()), i1.isArgument() || i2.isArgument());
 		info.getReads().addAll(i1.getReads());
 		info.getReads().addAll(i2.getReads());
 		info.getWrites().addAll(i1.getWrites());
@@ -276,24 +329,9 @@ public class VariablesAnalyzer {
 	}
 	
 	/**
-	 * Get's information for specific index and parent,
-	 * if there's no information yet , it creates new information.
-	 */
-	private VariableInformation get(int index, AbstractCodeNode parent) {
-		VariableInformation info = find(index, parent);
-		if (info != null)
-			return info;
-		info = new VariableInformation(index, false);
-		info.getWrites().add(parent);
-		add(info);
-		return info;
-		
-	}
-	
-	/**
 	 * Add's given variable information.
 	 */
-	public void add(VariableInformation info) {
+	private void add(VariableInformation info) {
 		if (!information.containsKey(info.getIndex())) {
 			information.put(info.getIndex(), new ArrayList<VariableInformation>());
 		}
@@ -305,19 +343,10 @@ public class VariablesAnalyzer {
 	}
 	
 	/**
-	 * Find's all variable's with specified index.
-	 */
-	public List<VariableInformation> find(int index) {
-		if (!information.containsKey(index))
-			return null;
-		return information.get(index);
-	}
-	
-	/**
 	 * Find's variable by index and node that does read or write
 	 * to it.
 	 */
-	public VariableInformation find(int index, AbstractCodeNode n) {
+	private VariableInformation find(int index, AbstractCodeNode n) {
 		if (!information.containsKey(index))
 			return null;
 		for (VariableInformation info : information.get(index)) {
@@ -325,16 +354,6 @@ public class VariablesAnalyzer {
 				return info;
 		}
 		return null;
-	}
-	
-	/**
-	 * Return's new list containing all variable's that can be found in code.
-	 */
-	public List<VariableInformation> getAll() {
-		List<VariableInformation> all = new ArrayList<VariableInformation>();
-		for (List<VariableInformation> vars : information.values())
-			all.addAll(vars);
-		return all;
 	}
 	
 	public class Visitor {
@@ -374,7 +393,7 @@ public class VariablesAnalyzer {
 				return;
 			VariableInformation[] information = exitVariables[index].toArray(new VariableInformation[0]);
 			for (int i = 1; i < information.length; i++)
-				information[0] = VariablesAnalyzer.this.merge(information[0], information[i]);
+				information[0] = LocalVariablesTypesAnalyzer.this.merge(information[0], information[i]);
 		}
 		
 		@SuppressWarnings("unchecked")
@@ -443,6 +462,10 @@ public class VariablesAnalyzer {
 		 */
 		private int index;
 		/**
+		 * Type of the variable.
+		 */
+		private Type type;
+		/**
 		 * Whether variable is argument.
 		 */
 		private boolean argument;
@@ -457,14 +480,20 @@ public class VariablesAnalyzer {
 		 */
 		private List<AbstractCodeNode> writes;
 		
-		public VariableInformation(int index, boolean isArgument) {
+		public VariableInformation(int index, Type type, boolean isArgument) {
 			this.index = index;
+			this.type = type;
+			this.argument = isArgument;
 			this.reads = new ArrayList<AbstractCodeNode>();
 			this.writes = new ArrayList<AbstractCodeNode>();
 		}
 
 		public int getIndex() {
 			return index;
+		}
+		
+		public Type getType() {
+			return type;
 		}
 		
 		public boolean isArgument() {

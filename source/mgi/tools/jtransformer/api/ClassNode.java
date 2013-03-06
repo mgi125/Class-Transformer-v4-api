@@ -3,6 +3,7 @@ package mgi.tools.jtransformer.api;
 import java.util.ArrayList;
 import java.util.List;
 
+import mgi.tools.jtransformer.ClassTransformer;
 import mgi.tools.jtransformer.Constants;
 
 import org.objectweb.asm.Attribute;
@@ -19,6 +20,11 @@ public class ClassNode extends ClassVisitor {
 	public static final int OPT_OPTIMIZATION_SKIP = 0x4;
 	public static final int OPT_OPTIMIZATION_SKIP_NONSYNTH_LOCALS = 0x8;
 	
+	/**
+	 * Contains instance of api used
+	 * to load or create this node.
+	 */
+	private ClassTransformer api;
 	/**
 	 * Contains options of this node.
 	 */
@@ -88,8 +94,9 @@ public class ClassNode extends ClassVisitor {
 	/**
 	 * Create's new class using given data.
 	 */
-	public ClassNode(int version, int accessor, String name, String signature, String superClass, String[] interfaces, int options) {
+	public ClassNode(ClassTransformer api, int version, int accessor, String name, String signature, String superClass, String[] interfaces, int options) {
 		super(Constants.ASM_API_VERSION);
+		this.api = api;
 		this.options = options;
 		this.version = version;
 		this.accessor = accessor;
@@ -102,8 +109,9 @@ public class ClassNode extends ClassVisitor {
 	/**
 	 * Initialize's class from given buffer.
 	 */
-	public ClassNode(byte[] buffer,int offset,int length,int options) throws RuntimeException {
+	public ClassNode(ClassTransformer api, byte[] buffer,int offset,int length,int options) throws RuntimeException {
 		super(Constants.ASM_API_VERSION);
+		this.api = api;
 		this.options = options;
 		try {
 			ClassReader reader = new ClassReader(buffer,offset,length);
@@ -224,6 +232,10 @@ public class ClassNode extends ClassVisitor {
 		}
 	}
 	
+	
+	public ClassTransformer getAPI() {
+		return api;
+	}
 	
 	public int getVersion() {
 		return version;

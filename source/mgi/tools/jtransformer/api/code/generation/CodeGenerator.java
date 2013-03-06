@@ -3,7 +3,6 @@ package mgi.tools.jtransformer.api.code.generation;
 import java.util.ArrayList;
 import java.util.List;
 
-import mgi.tools.jtransformer.Constants;
 import mgi.tools.jtransformer.api.ClassNode;
 import mgi.tools.jtransformer.api.MethodNode;
 import mgi.tools.jtransformer.api.code.AbstractCodeNode;
@@ -27,15 +26,15 @@ import mgi.tools.jtransformer.api.code.general.MonitorNode;
 import mgi.tools.jtransformer.api.code.general.PopableNode;
 import mgi.tools.jtransformer.api.code.math.MathematicalExpression;
 import mgi.tools.jtransformer.api.code.math.NegateExpression;
-import mgi.tools.jtransformer.api.code.memory.ArrayAssignationNode;
+import mgi.tools.jtransformer.api.code.memory.ArrayAssignmentNode;
 import mgi.tools.jtransformer.api.code.memory.ArrayLengthExpression;
 import mgi.tools.jtransformer.api.code.memory.ArrayLoadExpression;
-import mgi.tools.jtransformer.api.code.memory.FieldAssignationNode;
+import mgi.tools.jtransformer.api.code.memory.FieldAssignmentNode;
 import mgi.tools.jtransformer.api.code.memory.FieldLoadExpression;
 import mgi.tools.jtransformer.api.code.memory.NewUninitializedArrayExpression;
 import mgi.tools.jtransformer.api.code.memory.NewUninitializedObjectExpression;
-import mgi.tools.jtransformer.api.code.memory.VariableAssignationNode;
-import mgi.tools.jtransformer.api.code.memory.VariableLoadExpression;
+import mgi.tools.jtransformer.api.code.memory.RawVariableAssignmentNode;
+import mgi.tools.jtransformer.api.code.memory.RawVariableLoadExpression;
 import mgi.tools.jtransformer.api.code.synthetic.CaughtExceptionExpression;
 import mgi.tools.jtransformer.api.code.synthetic.CommentNode;
 import mgi.tools.jtransformer.api.code.tools.Utilities;
@@ -428,25 +427,24 @@ public class CodeGenerator extends MethodVisitor {
 			else if (op == Opcodes.IXOR || op == Opcodes.LXOR)
 				stack.push(new MathematicalExpression(stack.pop(), stack.pop(), MathematicalExpression.TYPE_XOR));
 			else if (op >= Opcodes.ILOAD && op <= Opcodes.ALOAD)
-				stack.push(new VariableLoadExpression(Utilities.variableLoadType(op), ((VariableInstruction)instruction).getIndex()));
+				stack.push(new RawVariableLoadExpression(Utilities.variableLoadType(op), ((VariableInstruction)instruction).getIndex()));
 			else if (op >= Opcodes.ISTORE && op <= Opcodes.ASTORE) {
 				if (stack.getSize() > 1)
 					dumpStack(block, stack);
-				ExpressionNode expr = stack.pop();
-				block.getCode().add(new VariableAssignationNode(expr.getType(), ((VariableInstruction)instruction).getIndex(),expr));
+				block.getCode().add(new RawVariableAssignmentNode(Utilities.variableStoreType(op), ((VariableInstruction)instruction).getIndex(), stack.pop()));
 			}
 			else if (op == Opcodes.IINC) {
 				dumpStack(block,stack);
 				int index = ((IntIncrementInstruction)instruction).getIndex();
 				int value = ((IntIncrementInstruction)instruction).getIncrementor();
-				block.getCode().add(new VariableAssignationNode(Type.INT_TYPE, index,new MathematicalExpression(new ConstantExpression(value), new VariableLoadExpression(Type.INT_TYPE,index), MathematicalExpression.TYPE_ADD)));
+				block.getCode().add(new RawVariableAssignmentNode(Type.INT_TYPE, index,new MathematicalExpression(new ConstantExpression(value), new RawVariableLoadExpression(Type.INT_TYPE,index), MathematicalExpression.TYPE_ADD)));
 			}
 			else if (op == Opcodes.PUTSTATIC) {
 				if (stack.getSize() > 1)
 					dumpStack(block, stack);
 				FieldInstruction fieldInstr = (FieldInstruction)instruction;
 				ExpressionNode expr = stack.pop();
-				block.getCode().add(new FieldAssignationNode(null, expr, fieldInstr.getOwner(), fieldInstr.getName(), fieldInstr.getDescriptor()));
+				block.getCode().add(new FieldAssignmentNode(null, expr, fieldInstr.getOwner(), fieldInstr.getName(), fieldInstr.getDescriptor()));
 			}
 			else if (op == Opcodes.PUTFIELD) {
 				if (stack.getSize() > 2)
@@ -454,7 +452,7 @@ public class CodeGenerator extends MethodVisitor {
 				ExpressionNode expr = stack.pop();
 				ExpressionNode base = stack.pop();
 				FieldInstruction fieldInstr = (FieldInstruction)instruction;
-				block.getCode().add(new FieldAssignationNode(base,expr, fieldInstr.getOwner(), fieldInstr.getName(), fieldInstr.getDescriptor()));
+				block.getCode().add(new FieldAssignmentNode(base,expr, fieldInstr.getOwner(), fieldInstr.getName(), fieldInstr.getDescriptor()));
 			}
 			else if (op == Opcodes.GETSTATIC || op == Opcodes.GETFIELD)
 				stack.push(new FieldLoadExpression(op == Opcodes.GETFIELD ? stack.pop() : null, ((FieldInstruction)instruction).getOwner(), ((FieldInstruction)instruction).getName(), ((FieldInstruction)instruction).getDescriptor()));
@@ -471,7 +469,7 @@ public class CodeGenerator extends MethodVisitor {
 				ExpressionNode value = stack.pop();
 				ExpressionNode index = stack.pop();
 				ExpressionNode base = stack.pop();	
-				block.getCode().add(new ArrayAssignationNode(Utilities.arrayStoreType(op), base, index, value));
+				block.getCode().add(new ArrayAssignmentNode(Utilities.arrayStoreType(op), base, index, value));
 			}
 			else if (op >= Opcodes.I2L && op <= Opcodes.I2S)
 				stack.push(new CastExpression(stack.pop(), Utilities.primitiveCastType(op)));
@@ -740,16 +738,17 @@ public class CodeGenerator extends MethodVisitor {
 		}
 		int miscStore = miscDumpsStartAddress;
 		for (int i = 0; i < expressions.length; i++) { 
-			//if (expressions[i] instanceof VariableLoadExpression && ((VariableLoadExpression)expressions[i]).getIndex() >= store) {
-				block.getCode().add(new VariableAssignationNode(expressions[i].getType(), miscStore, expressions[i]));
-				expressions[i] = new VariableLoadExpression(Utilities.variableLoadType(Utilities.variableLoadOpcode(expressions[i].getType())), miscStore);
-				miscStore += expressions[i].getType().getSize();
-			//}
+			Type base = Utilities.baseType(expressions[i].getType());	
+			block.getCode().add(new RawVariableAssignmentNode(base, miscStore, expressions[i]));
+			expressions[i] = new RawVariableLoadExpression(base, miscStore);
+			miscStore += expressions[i].getType().getSize();
+			
 		}
 		
 		for (int i = 0; i < expressions.length; i++) {
-			block.getCode().add(new VariableAssignationNode(expressions[i].getType(), store, expressions[i]));
-			stack.push(new VariableLoadExpression(Utilities.variableLoadType(Utilities.variableLoadOpcode(expressions[i].getType())), store));
+			Type base = Utilities.baseType(expressions[i].getType());	
+			block.getCode().add(new RawVariableAssignmentNode(base, store, expressions[i]));
+			stack.push(new RawVariableLoadExpression(base, store));
 			store += expressions[i].getType().getSize();
 		}
 		if ((parent.getParent().getOptions() & ClassNode.OPT_GENERATION_PRINT_STACK_DUMPS) != 0) {
@@ -768,9 +767,9 @@ public class CodeGenerator extends MethodVisitor {
 		while (c0.getSize() > 0) {
 			ExpressionNode expr1 = c0.pop();
 			ExpressionNode expr2 = c1.pop();
-			if (!(expr1 instanceof VariableLoadExpression) || !(expr2 instanceof VariableLoadExpression))
+			if (!(expr1 instanceof RawVariableLoadExpression) || !(expr2 instanceof RawVariableLoadExpression))
 				return false;
-			if (((VariableLoadExpression)expr1).getIndex() != ((VariableLoadExpression)expr2).getIndex())
+			if (((RawVariableLoadExpression)expr1).getIndex() != ((RawVariableLoadExpression)expr2).getIndex())
 				return false;
 			if (!expr1.getType().getDescriptor().equals(expr2.getType().getDescriptor()))
 				return false;

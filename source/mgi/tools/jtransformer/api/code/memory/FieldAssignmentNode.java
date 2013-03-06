@@ -9,7 +9,7 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-public class FieldAssignationNode extends AbstractCodeNode {
+public class FieldAssignmentNode extends AbstractCodeNode {
 
 	/**
 	 * Instance expression which represends 
@@ -33,7 +33,7 @@ public class FieldAssignationNode extends AbstractCodeNode {
 	 */
 	private String descriptor;
 	
-	public FieldAssignationNode(ExpressionNode instanceExpression, ExpressionNode expr, String owner, String name, String descriptor) {
+	public FieldAssignmentNode(ExpressionNode instanceExpression, ExpressionNode expr, String owner, String name, String descriptor) {
 		this.instanceExpression = instanceExpression;
 		this.expression = expr;
 		this.owner = owner;
